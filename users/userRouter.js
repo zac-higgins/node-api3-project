@@ -1,12 +1,15 @@
 const express = require('express');
-const db = require('./userDb')
+const userDb = require('./userDb');
+const postDb = require('../posts/postDb');
 const router = express.Router();
+
+//----------POST Requests----------//
 
 //Creates new user
 router.post('/', validateUser, (req, res) => {
   const userData = req.body;
 
-  db.insert(userData)
+  userDb.insert(userData)
     .then(user => {
       res.status(201).json({ message: "user added successfully" })
     })
@@ -17,12 +20,20 @@ router.post('/', validateUser, (req, res) => {
 });
 
 //creates new post under a specific user
-router.post('/:id/posts', (req, res) => {
+router.post('/:id/posts', validatePost, (req, res) => {
+  const postData = req.body;
+
+  postDb.insert(postData)
+    .then(() => {
+      res.status(201).json(postData)
+    })
 });
+
+//----------GET Requests----------//
 
 //gets list of all users
 router.get('/', (req, res) => {
-  db.get()
+  userDb.get()
     .then(users => {
       res.status(200).json(users);
     })
@@ -36,7 +47,7 @@ router.get('/', (req, res) => {
 router.get('/:id', validateUserId, (req, res) => {
   const id = req.params.id;
 
-  db.getById(id)
+  userDb.getById(id)
     .then(user => {
       res.status(200).json(user);
     })
@@ -49,7 +60,7 @@ router.get('/:id', validateUserId, (req, res) => {
 //gets all posts for a specific user
 router.get('/:id/posts', validateUserId, (req, res) => {
   const id = req.params.id;
-  db.getUserPosts(id)
+  userDb.getUserPosts(id)
     .then(posts => {
       if (posts.length) {
         res.status(200).json(posts);
@@ -59,26 +70,40 @@ router.get('/:id/posts', validateUserId, (req, res) => {
     })
 });
 
+//----------DELETE Requests----------//
+
 //deletes a specific user
 router.delete('/:id', validateUserId, (req, res) => {
   const id = req.params.id;
-  db.remove(id)
+  userDb.remove(id)
     .then(() => {
       res.status(200).json({ message: 'User deleted successfully' })
     })
 });
 
+//----------PUT Requests----------//
+
 //updates/makes changes to a specific user
-router.put('/:id', (req, res) => {
-  // do your magic!
+router.put('/:id', validateUserId, validateUser, (req, res) => {
+  const id = req.params.id;
+  const changes = req.body;
+  userDb.update(id, changes)
+    .then(user => {
+      res.status(200).json(user);
+    })
+    .catch(err => {
+      console.log(`error on PUT /api/users/${id}`, err);
+      res.status(500).json({ error: "The user information could not be updated." })
+    })
 });
 
-//custom middleware
+//---------custom middleware---------//
 
+//checks the given user id to make sure it exists in the database
 function validateUserId(req, res, next) {
   const id = req.params.id;
 
-  db.getById(id)
+  userDb.getById(id)
     .then(user => {
       if (user) {
         next();
@@ -90,9 +115,9 @@ function validateUserId(req, res, next) {
       console.log(`error on GET /api/users/${id}`, err);
       res.status(500).json({ error: "The user information could not be retrieved." })
     });
-
 }
 
+//checks the body on a request to create a new user to ensure there is a body
 function validateUser(req, res, next) {
   const userData = req.body;
 
@@ -103,8 +128,32 @@ function validateUser(req, res, next) {
   }
 }
 
+//checks the body on a request to create a new post to ensure there is a body
 function validatePost(req, res, next) {
-  // do your magic!
+  const id = req.params.id;
+  const postData = req.body;
+
+  userDb.getById(id)
+    .then(user => {
+      if (user) {
+        if (!postData) {
+          res.status(400).json({ message: "missing post data" })
+        } else if (!postData.text) {
+          res.status(400).json({ message: "missing required text field" })
+        } else if (!postData.user_id) {
+          res.status(400).json({ message: "missing required user_id field" })
+        } else {
+          next();
+        }
+      } else {
+        res.status(400).json({ message: "invalid user id" })
+      }
+    })
+    .catch(err => {
+      console.log(`error on GET /api/users/${id}`, err);
+      res.status(500).json({ error: "The user information could not be retrieved." })
+    });
+
 }
 
 module.exports = router;

@@ -19,7 +19,6 @@ function logger(req, res, next) {
 //----------Implement Custom Middlewear----------//
 server.use(helmet());
 server.use(logger);
-server.use('/api/posts', postRouter);
 server.use('/api/users', userRouter);
 
 //----------Sanity Check----------//
